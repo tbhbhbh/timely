@@ -1,26 +1,19 @@
-import 'package:flutter/material.dart';
+import 'dart:core';
 import 'dart:async' show Future, Timer;
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:flutter/cupertino.dart';
-import 'dart:convert';
 import 'package:flare_flutter/flare_actor.dart';
-import 'package:flare_flutter/flare_controller.dart';
-import 'dart:core';
 
 void main() => runApp(new MyApp());
 
 String formatDateTime(DateTime dateTime) {
-  return DateFormat('hh:mm').format(dateTime);
+  return DateFormat.jm().format(dateTime);
 }
 
-class SkyController{
-  String animation;
-
-  SkyController({this.animation});
-}
-
-SkyController skyController = new SkyController(animation: "idle");
 class TimeZone{
   String value; num offset; String text;
 
@@ -65,12 +58,10 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   List<Widget> timeZonePickerList = new List<Widget>();
   List<TimeZone> timeZoneList = new List<TimeZone>();
-  List data;
+  List<TimeZone> data = new List<TimeZone>();
 
-  bool shouldShow = true;
   TimeZone timeZone;
   String _timeString;
-  bool pressed = false;
   bool _picked = false;
 
   Future<String> loadTimeZonesAsset() async {
@@ -82,11 +73,10 @@ class _MyHomePageState extends State<MyHomePage> {
     final timezones = jsonDecode(jsonString);
 
     timezones.forEach((timezoneJson) {
-      TimeZone timezone = new TimeZone.fromJson(timezoneJson);
-      timeZoneList.add(timezone);
+      data.add(new TimeZone.fromJson(timezoneJson));
     });
     setState(() {
-      data = timeZoneList;
+      timeZoneList = data;
     });
   }
 
@@ -97,7 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   _populateTimeZonePicker() {
-    return data.map((timezone) =>
+    return timeZoneList.map((timezone) =>
     Center(child: Text(timezone.text, 
     style: Theme.of(context).textTheme.body1,
     textAlign: TextAlign.center))).toList();
@@ -107,15 +97,17 @@ class _MyHomePageState extends State<MyHomePage> {
     Duration diff;
 
     Duration nowOffset = DateTime.now().timeZoneOffset;
-    Duration targetOffset = new Duration(hours: timezone.offset);
+    int timezoneMinutes = (timezone.offset * 60).toInt();
+    Duration targetOffset = new Duration(minutes: 
+      timezoneMinutes);
 
     diff = (targetOffset.abs() > nowOffset) ? targetOffset - nowOffset
           : nowOffset - targetOffset;
 
-    DateTime now = DateTime.now().add(diff);
+    DateTime pickedTime = DateTime.now().add(diff);
+
     setState(() {
-      skyController.animation = "start";
-      _timeString = formatDateTime(now);
+      _timeString = formatDateTime(pickedTime);
     });
     return _timeString;
   }
@@ -136,6 +128,15 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     });
   }
+
+
+  _getAnimation() {
+    num currHr = DateTime.now().hour;
+    if (currHr > 6 && currHr < 18)
+      return "nightToDay";
+    else return "dayToNight";
+  }
+
   @override
   Widget build(BuildContext context) {
     if (data != null) {
@@ -147,10 +148,10 @@ class _MyHomePageState extends State<MyHomePage> {
               Positioned.fill(
                 child: FlareActor(
                   "assets/Timely.flr",
-                  animation: skyController.animation,
+                  animation: _getAnimation(),
                   alignment: Alignment.center,
-                  fit: BoxFit.contain,
-              ) 
+                  fit: BoxFit.contain
+                  )
               ),
               Container(
                 alignment: Alignment.center,
@@ -159,7 +160,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     child: !_picked ? Clock() : 
                     Text(_handlePicked(timeZone) + '\n in \n' + timeZone.value,
                     style: Theme.of(context).textTheme.title,
-                    textAlign: TextAlign.center,),
+                    textAlign: TextAlign.center),
               ))
           ])
        );
@@ -168,8 +169,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
 
 class Clock extends StatefulWidget {
-
-  Clock({ Key key} ) : super(key: key);
+  Clock({ Key key }) : super(key: key);
   
   @override 
   _ClockState createState() => _ClockState();
@@ -179,10 +179,9 @@ class _ClockState extends State<Clock> with SingleTickerProviderStateMixin {
   String _timeString;
   
   void _getCurrentTime() {
-    final String formattedDateTime = formatDateTime(DateTime.now());
-    if (this.mounted) {    
+    if (this.mounted) {
       setState(() {
-          _timeString = formattedDateTime;
+          _timeString = formatDateTime(DateTime.now());
       });
     }
   }
@@ -198,7 +197,7 @@ class _ClockState extends State<Clock> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Text(_timeString,
           style: Theme.of(context).textTheme.title,
-          textAlign: TextAlign.center,
+          textAlign: TextAlign.center
     );
   }
 }
