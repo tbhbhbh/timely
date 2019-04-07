@@ -4,39 +4,37 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:convert';
+import 'package:flare_flutter/flare_actor.dart';
+import 'package:flare_flutter/flare_controller.dart';
+import 'dart:core';
 
-void main() => runApp(new MyApp()
-);
+void main() => runApp(new MyApp());
 
 String formatDateTime(DateTime dateTime) {
   return DateFormat('hh:mm').format(dateTime);
 }
 
+class SkyController{
+  String animation;
+
+  SkyController({this.animation});
+}
+
+SkyController skyController = new SkyController(animation: "idle");
 class TimeZone{
-  String value;
-  String abbr;
-  num offset;
-  bool isdst;
-  String text;
-  List<dynamic> utc;
+  String value; num offset; String text;
 
   TimeZone({
     this.value,
-    this.abbr,
     this.offset,
-    this.isdst,
     this.text,
-    this.utc
   });
 
   factory TimeZone.fromJson(Map<String, dynamic> parsedJson) {
     return TimeZone(
       value: parsedJson['value'],
-      abbr: parsedJson['abbr'],
       offset: parsedJson['offset'],
-      isdst: parsedJson['isdst'],
       text: parsedJson['text'],
-      utc: parsedJson['utc']
     );
   }
 }
@@ -44,8 +42,14 @@ class TimeZone{
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-
     return MaterialApp(
+      theme: ThemeData(
+        fontFamily: 'Digital-7',
+        textTheme: TextTheme(
+          title: TextStyle(color: Colors.white, fontSize: 52.0),
+          body1: TextStyle(color: Colors.black, fontSize: 18.0),
+        )
+      ),
       home: MyHomePage(),
     );
   }
@@ -59,11 +63,16 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  List<Widget> timeZonePickerList = new List<Widget>();
   List<TimeZone> timeZoneList = new List<TimeZone>();
+  List data;
+
   bool shouldShow = true;
-  Clock clock;
-  Selector selector;
-  
+  TimeZone timeZone;
+  String _timeString;
+  bool pressed = false;
+  bool _picked = false;
+
   Future<String> loadTimeZonesAsset() async {
     return await rootBundle.loadString('assets/timezones.json');
   }
@@ -71,132 +80,96 @@ class _MyHomePageState extends State<MyHomePage> {
   Future loadTimeZones() async {
     String jsonString = await loadTimeZonesAsset();
     final timezones = jsonDecode(jsonString);
+
     timezones.forEach((timezoneJson) {
       TimeZone timezone = new TimeZone.fromJson(timezoneJson);
       timeZoneList.add(timezone);
     });
+    setState(() {
+      data = timeZoneList;
+    });
   }
-
 
   @override
   void initState() {
     super.initState();
-    clock = Clock(this.callback);
-    selector = Selector(this.timeZoneList);
-  }
-
-  void callback() {
-    setState(() {
-      this.shouldShow = !this.shouldShow;
-    });
-  }
-  
-  @override
-  Widget build(BuildContext context) {
     loadTimeZones();
-    return new Scaffold(
-      appBar: new AppBar(title: new Text('app'),
-      ),
-      body: Center(
-        child:
-        shouldShow ? Clock(this.callback) : Selector(this.timeZoneList),
-      ),
-      );
   }
-}
 
-
-class Selector extends StatefulWidget {
-  Selector( this.timeZoneList, { Key key }) : super(key: key);
-  final List<TimeZone> timeZoneList;
-
-  @override
-  _SelectorState createState() => _SelectorState();
-}
-
-class _SelectorState extends State<Selector> {
-  bool pressed = false;
-  bool _picked = false;
-  String _time;
-  String timeZoneAbbr;
-
-  List<Widget> timezonetext = new List<Widget>();
-
-  _showTimePicker() {
-    showModalBottomSheet(context: context, builder: (context) {
-      return Container(
-        width: 200.0,
-        height: 200.0,
-        child: CupertinoDatePicker(
-          mode: CupertinoDatePickerMode.time,
-          onDateTimeChanged: (DateTime newdate) {
-              print('time picked: '+ _picked.toString());
-            if (_time != newdate.toString()) {
-              setState(() {
-                _picked = !_picked;
-                _time = formatDateTime(newdate);
-              });
-            }
-          },
-        ),
-      );
-    });
-  }
   _populateTimeZonePicker() {
-
-    print(this.widget.timeZoneList[0].abbr);
-    return this.widget.timeZoneList.map((timezone) =>
-    Center(child: Text(timezone.abbr))).toList();
+    return data.map((timezone) =>
+    Center(child: Text(timezone.text, 
+    style: Theme.of(context).textTheme.body1,
+    textAlign: TextAlign.center))).toList();
   }
 
-  _showTimeZonePicker() {
-    print (timezonetext.length);
+  String _handlePicked(TimeZone timezone) {
+    Duration diff;
+
+    Duration nowOffset = DateTime.now().timeZoneOffset;
+    Duration targetOffset = new Duration(hours: timezone.offset);
+
+    diff = (targetOffset.abs() > nowOffset) ? targetOffset - nowOffset
+          : nowOffset - targetOffset;
+
+    DateTime now = DateTime.now().add(diff);
+    setState(() {
+      skyController.animation = "start";
+      _timeString = formatDateTime(now);
+    });
+    return _timeString;
+  }
+
+  void _showTimeZonePicker() {
     showModalBottomSheet(context: context, builder: (context) {
       return Container(
         child: CupertinoPicker(
           onSelectedItemChanged: (index) {
-            timeZoneAbbr = this.widget.timeZoneList[index].abbr;
-          },
+            timeZone = timeZoneList[index];
+            setState(() {
+              _picked = true;
+            });
+            },
           itemExtent: 32,
-          children: timezonetext
+          children: timeZonePickerList,
         )
       );
     });
   }
   @override
-  Widget build(BuildContext) {
-    timezonetext = _populateTimeZonePicker();
-    return Container(
-      padding: EdgeInsets.all(12),
-      child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        new Expanded(
-          flex: 4,
-            child: new FlatButton(
-              onPressed: _showTimePicker,
-              child: !_picked ? Text('Pick your time')
-              : Text(_time.toString()),
-         ),
-          ),
-        new Expanded(
-          flex: 3,
-            child: new FlatButton (
-              onPressed: _showTimeZonePicker,
-              child: Text('Pick time zone')
-            ),
-          ),
-      ]
-      ),
-    );
-    
+  Widget build(BuildContext context) {
+    if (data != null) {
+      timeZonePickerList = _populateTimeZonePicker();
+    }
+       return new Container(
+         child: Stack(
+           children: <Widget>[
+              Positioned.fill(
+                child: FlareActor(
+                  "assets/Timely.flr",
+                  animation: skyController.animation,
+                  alignment: Alignment.center,
+                  fit: BoxFit.contain,
+              ) 
+              ),
+              Container(
+                alignment: Alignment.center,
+                child: FlatButton(
+                    onPressed: () { _showTimeZonePicker(); },
+                    child: !_picked ? Clock() : 
+                    Text(_handlePicked(timeZone) + '\n in \n' + timeZone.value,
+                    style: Theme.of(context).textTheme.title,
+                    textAlign: TextAlign.center,),
+              ))
+          ])
+       );
   }
 }
 
-class Clock extends StatefulWidget {
-  final Function callback;
 
-  Clock(this.callback, { Key key} ) : super(key: key);
+class Clock extends StatefulWidget {
+
+  Clock({ Key key} ) : super(key: key);
   
   @override 
   _ClockState createState() => _ClockState();
@@ -204,13 +177,10 @@ class Clock extends StatefulWidget {
 
 class _ClockState extends State<Clock> with SingleTickerProviderStateMixin {
   String _timeString;
-  bool _showTime = true;
-  bool shouldShow;
-
-
+  
   void _getCurrentTime() {
     final String formattedDateTime = formatDateTime(DateTime.now());
-    if (this.mounted && _showTime) {    
+    if (this.mounted) {    
       setState(() {
           _timeString = formattedDateTime;
       });
@@ -223,15 +193,12 @@ class _ClockState extends State<Clock> with SingleTickerProviderStateMixin {
     _timeString = formatDateTime(DateTime.now());
     Timer.periodic(Duration(seconds: 1), (Timer t) => _getCurrentTime());
   }
-  
+
   @override
   Widget build(BuildContext context) {
-
-    return FlatButton(
-          child: Text(_timeString),
-          onPressed: () {
-            this.widget.callback();
-          },
-    );   
+    return Text(_timeString,
+          style: Theme.of(context).textTheme.title,
+          textAlign: TextAlign.center,
+    );
   }
 }
