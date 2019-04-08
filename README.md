@@ -20,13 +20,19 @@ It's always a struggle for me to catch events in different parts of the world gi
 
 ### Quick, easy and convenient
 
+![image](images/menu.jpeg)
+
 From tapping on the screen, to choosing a timezone, then to getting the time is just 3 simple button presses.
 
 ### Ambient background
 
 The background depends on your local time! There will be a day time background for hours between 6 am to 6pm, and a night time background for 6pm to 6am.
 
+![image](images/screen.jpeg)
+
 ### Wide range of timezones
 
 Timezone database was taken from [here](https://github.com/dmfilipenko/timezones.json). Factory methods and JSON parsing were used to parse in this data.
+
+![image](images/converted.jpeg)
 
